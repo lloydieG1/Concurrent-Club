@@ -5,14 +5,19 @@
  * closed, then close the exit once everyone has left.
  */
 public class NightClub {
-    // TODO You need a variable for counting people named: peopleCount
-    // you need a variable here for the capacity of the club: capacity
     public String name = "default";
     public boolean isOpen = false;
+    
     private Entrance entrance;
     private Exit exit;
     private Manager manager;
-    // TODO Appropriate Thread attributes here
+    private int capacity;
+    private int peopleCount;
+
+    private Thread entranceThread;
+    private Thread exitThread;
+    private Thread managerThread;
+
     
     NightClub (String name, int capacity, Manager manager){
         this.name = name;
@@ -20,55 +25,84 @@ public class NightClub {
         this.manager = manager;
         manager.acceptJob(this);
     }
+    
     public void start(){
         System.out.println("We are starting club:" + name);
-        // TODO Create a thread for the manager
+
         this.entrance = new Entrance(this);
         this.exit = new Exit(this);
-        // TODO Start a thread for the manager
+        
+        //create and start manager thread
+        this.managerThread = new Thread(manager);
+        this.managerThread.start();
     }
+    
     public void end() throws InterruptedException{
+    	//end manager thread
+    	this.managerThread.interrupt();
+    	this.managerThread.join();
         this.close();
-        // kill the thread that is running the manager
+
         System.out.println("The simulation has ended.");
     }
-    public void open() throws InterruptedException{
+    
+    public synchronized void open() throws InterruptedException{
         if (!isOpen){
             isOpen = true;
-            // TODO Create threads so that users can access or leave the club.
-            // Should you also start these threads here?
+            //start entrance and exit threads
+            entranceThread = new Thread(entrance);
+            exitThread = new Thread(exit);
+            entranceThread.start();
+            exitThread.start();      
         }
         else{
             System.out.println("The club is already open!");
         }
     }
+    
     public void close() throws InterruptedException{
         if (isOpen){
             isOpen = false;
-            System.out.println("Closing the entrance.");
-            // TODO kill the threads that are facilitating accessing and
-			// leaving feature. 
-            while(getPeopleCount()>0){
+            
+            //end entrance and exit threads
+            entranceThread.interrupt();
+            exitThread.interrupt();
+
+            while(getPeopleCount() > 0){
                 leave();
                 System.out.println("People are leaving:" + getPeopleCount());
             }
             System.out.println("Everyone has left the club.");
+            
+            entranceThread.join();
+            exitThread.join();
         }
         else{
             System.out.println("The club is already closed!");
         }
     }
+    
     public int getPeopleCount() {
         return peopleCount;
     }
-    public void enter() {
-        // TODO Must wait for space in a while loop for space in the club.
-        peopleCount++;
+    
+    public synchronized void enter() throws InterruptedException {
+        // wait for space in club before incrementing amount of people in club
+    	while (getPeopleCount() == capacity) {
+            wait();
+    	}
+    	peopleCount++;
+    	notifyAll();
     }
-    public int leave(){
-        // TODO Must have enough people to allow this feature. Is there a 
-		// condition to check?
+    
+    public synchronized int leave() throws InterruptedException{
+    	//will decrement the count of people in the club only if there is at least one
+    	while (getPeopleCount() == 0) {
+            wait();
+    	}
         peopleCount--; 
+    	notifyAll();
+    	
         return peopleCount;
     }
 }
